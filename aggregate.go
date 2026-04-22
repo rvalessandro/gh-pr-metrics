@@ -21,6 +21,8 @@ type authorRow struct {
 	PRs         int
 	Adds        int
 	Dels        int
+	AvgLines    int // mean of (additions + deletions) per PR
+	MedLines    int // median of (additions + deletions) per PR
 	TTFR        durSummary // created → first review
 	Feedback    durSummary // first review → first approval
 	ApprToMerge durSummary // first approval → merge
@@ -101,6 +103,7 @@ func authorRollup(rows []prRow) []authorRow {
 	feedback := map[string][]time.Duration{}
 	apprToMerge := map[string][]time.Duration{}
 	e2e := map[string][]time.Duration{}
+	sizes := map[string][]int{}
 
 	for _, r := range rows {
 		a, ok := byLogin[r.Author]
@@ -111,6 +114,7 @@ func authorRollup(rows []prRow) []authorRow {
 		a.PRs++
 		a.Adds += r.Additions
 		a.Dels += r.Deletions
+		sizes[r.Author] = append(sizes[r.Author], r.Additions+r.Deletions)
 		ttfr[r.Author] = append(ttfr[r.Author], r.TimeToFirstReview)
 		feedback[r.Author] = append(feedback[r.Author], r.ReviewToApproval)
 		apprToMerge[r.Author] = append(apprToMerge[r.Author], r.FirstApprovalToMerge)
@@ -123,6 +127,12 @@ func authorRollup(rows []prRow) []authorRow {
 		a.Feedback = summarize(feedback[login])
 		a.ApprToMerge = summarize(apprToMerge[login])
 		a.E2E = summarize(e2e[login])
+		if a.PRs > 0 {
+			a.AvgLines = (a.Adds + a.Dels) / a.PRs
+			s := append([]int(nil), sizes[login]...)
+			sort.Ints(s)
+			a.MedLines = s[len(s)/2]
+		}
 		out = append(out, *a)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].PRs > out[j].PRs })

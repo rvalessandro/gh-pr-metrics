@@ -73,7 +73,7 @@ func writeTable(w io.Writer, rows []prRow, s summary) {
 	if len(s.ByAuthor) > 0 {
 		fmt.Fprintln(w, "\nBY AUTHOR  p50 / p90 per stage")
 		atw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(atw, "LOGIN\tPRS\tADD\tDEL\tTTFR\tFEEDBACK\tAPPR→MERGE\tE2E")
+		fmt.Fprintln(atw, "LOGIN\tPRS\tADD\tDEL\tAVG/MED LINES\tTTFR\tFEEDBACK\tAPPR→MERGE\tE2E")
 		pair := func(d durSummary) string {
 			if d.N == 0 {
 				return "--"
@@ -81,13 +81,14 @@ func writeTable(w io.Writer, rows []prRow, s summary) {
 			return fmt.Sprintf("%s / %s", fmtDur(d.P50), fmtDur(d.P90))
 		}
 		for _, a := range s.ByAuthor {
-			fmt.Fprintf(atw, "%s\t%d\t%d\t%d\t%s\t%s\t%s\t%s\n",
-				a.Login, a.PRs, a.Adds, a.Dels,
+			fmt.Fprintf(atw, "%s\t%d\t%d\t%d\t%d / %d\t%s\t%s\t%s\t%s\n",
+				a.Login, a.PRs, a.Adds, a.Dels, a.AvgLines, a.MedLines,
 				pair(a.TTFR), pair(a.Feedback), pair(a.ApprToMerge), pair(a.E2E),
 			)
 		}
 		atw.Flush()
-		fmt.Fprintln(w, "\nTTFR       = created → first review")
+		fmt.Fprintln(w, "\nAVG/MED    = mean / median lines changed (add+del) per PR")
+		fmt.Fprintln(w, "TTFR       = created → first review")
 		fmt.Fprintln(w, "FEEDBACK   = first review → first approval (iteration loop)")
 		fmt.Fprintln(w, "APPR→MERGE = first approval → merge")
 		fmt.Fprintln(w, "E2E        = created → merged")
@@ -198,8 +199,8 @@ func writeMarkdown(w io.Writer, rows []prRow, s summary) {
 		s.Sizes.XS, s.Sizes.S, s.Sizes.M, s.Sizes.L, s.Sizes.XL, s.Sizes.XXL)
 	if len(s.ByAuthor) > 0 {
 		fmt.Fprintln(w, "## By author — p50 / p90 per stage\n")
-		fmt.Fprintln(w, "| login | PRs | add | del | TTFR | feedback | appr→merge | E2E |")
-		fmt.Fprintln(w, "| --- | --- | --- | --- | --- | --- | --- | --- |")
+		fmt.Fprintln(w, "| login | PRs | add | del | avg/med lines | TTFR | feedback | appr→merge | E2E |")
+		fmt.Fprintln(w, "| --- | --- | --- | --- | --- | --- | --- | --- | --- |")
 		pair := func(d durSummary) string {
 			if d.N == 0 {
 				return "--"
@@ -207,8 +208,8 @@ func writeMarkdown(w io.Writer, rows []prRow, s summary) {
 			return fmt.Sprintf("%s / %s", fmtDur(d.P50), fmtDur(d.P90))
 		}
 		for _, a := range s.ByAuthor {
-			fmt.Fprintf(w, "| %s | %d | %d | %d | %s | %s | %s | %s |\n",
-				a.Login, a.PRs, a.Adds, a.Dels,
+			fmt.Fprintf(w, "| %s | %d | %d | %d | %d / %d | %s | %s | %s | %s |\n",
+				a.Login, a.PRs, a.Adds, a.Dels, a.AvgLines, a.MedLines,
 				pair(a.TTFR), pair(a.Feedback), pair(a.ApprToMerge), pair(a.E2E))
 		}
 	}
