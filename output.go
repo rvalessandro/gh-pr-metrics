@@ -71,22 +71,31 @@ func writeTable(w io.Writer, rows []prRow, s summary) {
 		s.Sizes.XS, s.Sizes.S, s.Sizes.M, s.Sizes.L, s.Sizes.XL, s.Sizes.XXL)
 
 	if len(s.ByAuthor) > 0 {
-		fmt.Fprintln(w, "\nBY AUTHOR  p50 / p90 per stage")
-		atw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(atw, "LOGIN\tPRS\tADD\tDEL\tAVG/MED LINES\tTTFR\tFEEDBACK\tAPPR→MERGE\tE2E")
-		pair := func(d durSummary) string {
+		fmt.Fprintln(w, "\nBY AUTHOR — output")
+		otw := tabwriter.NewWriter(w, 0, 0, 2, ' ', tabwriter.AlignRight)
+		fmt.Fprintln(otw, "LOGIN\tPRS\t+LINES\t-LINES\tAVG\tMED\t")
+		for _, a := range s.ByAuthor {
+			fmt.Fprintf(otw, "%s\t%d\t%d\t%d\t%d\t%d\t\n",
+				a.Login, a.PRs, a.Adds, a.Dels, a.AvgLines, a.MedLines)
+		}
+		otw.Flush()
+
+		fmt.Fprintln(w, "\nBY AUTHOR — cycle time (p50; use --format csv for p90)")
+		ctw := tabwriter.NewWriter(w, 0, 0, 2, ' ', tabwriter.AlignRight)
+		fmt.Fprintln(ctw, "LOGIN\tPRS\tTTFR\tFEEDBACK\tAPPR→MERGE\tE2E\t")
+		p50 := func(d durSummary) string {
 			if d.N == 0 {
 				return "--"
 			}
-			return fmt.Sprintf("%s / %s", fmtDur(d.P50), fmtDur(d.P90))
+			return fmtDur(d.P50)
 		}
 		for _, a := range s.ByAuthor {
-			fmt.Fprintf(atw, "%s\t%d\t%d\t%d\t%d / %d\t%s\t%s\t%s\t%s\n",
-				a.Login, a.PRs, a.Adds, a.Dels, a.AvgLines, a.MedLines,
-				pair(a.TTFR), pair(a.Feedback), pair(a.ApprToMerge), pair(a.E2E),
-			)
+			fmt.Fprintf(ctw, "%s\t%d\t%s\t%s\t%s\t%s\t\n",
+				a.Login, a.PRs,
+				p50(a.TTFR), p50(a.Feedback), p50(a.ApprToMerge), p50(a.E2E))
 		}
-		atw.Flush()
+		ctw.Flush()
+
 		fmt.Fprintln(w, "\nAVG/MED    = mean / median lines changed (add+del) per PR")
 		fmt.Fprintln(w, "TTFR       = created → first review")
 		fmt.Fprintln(w, "FEEDBACK   = first review → first approval (iteration loop)")
