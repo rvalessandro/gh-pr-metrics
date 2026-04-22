@@ -26,9 +26,11 @@ func (s *stringList) Set(v string) error {
 }
 
 func main() {
-	var repos, users stringList
+	var repos, users, excludeUsers stringList
 	flag.Var(&repos, "repo", "target repo in owner/name form (repeatable or comma-separated)")
 	flag.Var(&users, "users", "whitelist of author logins (repeatable or comma-separated); PRs by others are excluded")
+	flag.Var(&excludeUsers, "exclude-users", "author logins to exclude (repeatable or comma-separated)")
+	excludeBots := flag.Bool("exclude-bots", false, "exclude PRs whose author is a GitHub App/Bot (dependabot, renovate, etc.)")
 	start := flag.String("start", "", "start date YYYY-MM-DD (default: 30 days ago)")
 	end := flag.String("end", "", "end date YYYY-MM-DD (default: today)")
 	extraQuery := flag.String("query", "", "extra GitHub search qualifiers appended to the merged PR query")
@@ -72,7 +74,7 @@ func main() {
 	}
 	windowDays := int(endT.Sub(startT).Hours()/24) + 1
 
-	rows := collect(client, repos, users, startT, endT, *chunkDays, *extraQuery)
+	rows := collect(client, repos, users, excludeUsers, *excludeBots, startT, endT, *chunkDays, *extraQuery)
 
 	s := summarizeAll(rows, windowDays)
 
@@ -90,14 +92,24 @@ func main() {
 	}
 }
 
-func collect(client api.GQLClient, repos, users stringList, startT, endT time.Time, chunkDays int, extraQuery string) []prRow {
+func collect(client api.GQLClient, repos, users, excludeUsers stringList, excludeBots bool, startT, endT time.Time, chunkDays int, extraQuery string) []prRow {
 	chunks := chunkRange(startT, endT, chunkDays)
+	exclude := map[string]bool{}
+	for _, u := range excludeUsers {
+		exclude[u] = true
+	}
 	seen := map[string]bool{}
 	var rows []prRow
 	for _, repo := range repos {
 		for _, ch := range chunks {
 			prs := queryChunk(client, repo, users, ch.from, ch.to, extraQuery)
 			for _, p := range prs {
+				if excludeBots && p.Author.Typename == "Bot" {
+					continue
+				}
+				if exclude[p.Author.Login] {
+					continue
+				}
 				key := fmt.Sprintf("%s#%d", p.Repository.NameWithOwner, p.Number)
 				if seen[key] {
 					continue

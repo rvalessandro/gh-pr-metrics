@@ -5,7 +5,10 @@ type pageInfo struct {
 	EndCursor   string
 }
 
-type author struct{ Login string }
+type author struct {
+	Login    string
+	Typename string `graphql:"__typename"`
+}
 
 type reviewNode struct {
 	Author    author

@@ -39,6 +39,8 @@ gh pr-metrics --format md > metrics.md
 | --- | --- | --- |
 | `--repo` | current repo | target repo `owner/name` (repeatable or comma-separated) |
 | `--users` | — | whitelist of author logins (filters out PRs by others) |
+| `--exclude-users` | — | author logins to exclude (repeatable or comma-separated) |
+| `--exclude-bots` | `false` | drop PRs whose author is a GitHub App/Bot (dependabot, renovate, …) |
 | `--start` | 30 days ago | start date `YYYY-MM-DD` (inclusive) |
 | `--end` | today | end date `YYYY-MM-DD` (inclusive) |
 | `--query` | — | extra GitHub search qualifiers to append |
