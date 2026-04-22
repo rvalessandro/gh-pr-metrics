@@ -50,11 +50,19 @@ gh pr-metrics --format md > metrics.md
 
 ## Metrics
 
-**Per PR**: commits, additions, deletions, files, comments, participants, time-to-first-review, first-to-last-review, first-approval-to-merge, feature lead time, size bucket.
+**PR lifecycle stages** (all reported as p50 / p90 / max per stage, top-level and per author):
 
-**Summary**: PR count, throughput/week, total churn, p50 / p90 / max of each time metric.
+1. **TTFR** — created → first non-author review
+2. **Feedback** — first review → first approval (iteration loop)
+3. **Appr→Merge** — first approval → merged
+4. **E2E** — created → merged (total PR cycle time)
+5. **Feature lead time** — earliest commit → merged (includes work done before opening the PR)
+
+**Per PR** (in table / CSV / JSON): commits, additions, deletions, files, comments, participants, all 5 durations above, size bucket.
+
+**Summary**: PR count, throughput/week, total churn, p50 / p90 / max of each stage.
 
 **Size distribution** (lines changed = additions + deletions):
 XS (<10) · S (<50) · M (<250) · L (<1000) · XL (<5000) · XXL (≥5000).
 
-**Per author**: PR count, churn, p50/p90 of time-to-first-review and lead time.
+**Per author** rollup: PR count, churn, p50/p90 of each stage.

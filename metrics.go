@@ -18,8 +18,10 @@ type prRow struct {
 	CreatedAt            time.Time
 	TimeToFirstReview    time.Duration // -1 == n/a
 	FirstToLastReview    time.Duration
+	ReviewToApproval     time.Duration // first non-author review → first approval
 	FirstApprovalToMerge time.Duration
-	FeatureLeadTime      time.Duration
+	CreatedToMerged      time.Duration // true e2e: PR open → merge
+	FeatureLeadTime      time.Duration // earliest commit → merge
 	SizeBucket           string
 }
 
@@ -78,6 +80,32 @@ func firstToLastReview(p pullRequestNode) time.Duration {
 		return naDuration
 	}
 	return last.Sub(first)
+}
+
+func reviewToApproval(p pullRequestNode) time.Duration {
+	var firstReview time.Time
+	foundFirst := false
+	for _, r := range p.Reviews.Nodes {
+		if r.Author.Login == p.Author.Login {
+			continue
+		}
+		t := parse(r.CreatedAt)
+		if !foundFirst {
+			firstReview = t
+			foundFirst = true
+		}
+		if r.State == "APPROVED" {
+			return t.Sub(firstReview)
+		}
+	}
+	return naDuration
+}
+
+func createdToMerged(p pullRequestNode) time.Duration {
+	if p.MergedAt == "" || p.CreatedAt == "" {
+		return naDuration
+	}
+	return parse(p.MergedAt).Sub(parse(p.CreatedAt))
 }
 
 func firstApprovalToMerge(p pullRequestNode) time.Duration {
@@ -145,7 +173,9 @@ func rowFromPR(p pullRequestNode) prRow {
 		CreatedAt:            parse(p.CreatedAt),
 		TimeToFirstReview:    timeToFirstReview(p),
 		FirstToLastReview:    firstToLastReview(p),
+		ReviewToApproval:     reviewToApproval(p),
 		FirstApprovalToMerge: firstApprovalToMerge(p),
+		CreatedToMerged:      createdToMerged(p),
 		FeatureLeadTime:      featureLeadTime(p),
 		SizeBucket:           sizeBucket(p.Additions, p.Deletions),
 	}

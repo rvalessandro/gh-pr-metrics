@@ -17,12 +17,14 @@ type sizeDist struct {
 }
 
 type authorRow struct {
-	Login    string
-	PRs      int
-	Adds     int
-	Dels     int
-	FirstRev durSummary
-	LeadTime durSummary
+	Login       string
+	PRs         int
+	Adds        int
+	Dels        int
+	TTFR        durSummary // created → first review
+	Feedback    durSummary // first review → first approval
+	ApprToMerge durSummary // first approval → merge
+	E2E         durSummary // created → merge
 }
 
 type summary struct {
@@ -34,7 +36,9 @@ type summary struct {
 	ChangedFiles         int
 	TimeToFirstReview    durSummary
 	FirstToLastReview    durSummary
+	ReviewToApproval     durSummary
 	FirstApprovalToMerge durSummary
+	CreatedToMerged      durSummary
 	FeatureLeadTime      durSummary
 	Sizes                sizeDist
 	ByAuthor             []authorRow
@@ -93,8 +97,10 @@ func bucketize(rows []prRow) sizeDist {
 
 func authorRollup(rows []prRow) []authorRow {
 	byLogin := map[string]*authorRow{}
-	firstRevs := map[string][]time.Duration{}
-	leadTimes := map[string][]time.Duration{}
+	ttfr := map[string][]time.Duration{}
+	feedback := map[string][]time.Duration{}
+	apprToMerge := map[string][]time.Duration{}
+	e2e := map[string][]time.Duration{}
 
 	for _, r := range rows {
 		a, ok := byLogin[r.Author]
@@ -105,14 +111,18 @@ func authorRollup(rows []prRow) []authorRow {
 		a.PRs++
 		a.Adds += r.Additions
 		a.Dels += r.Deletions
-		firstRevs[r.Author] = append(firstRevs[r.Author], r.TimeToFirstReview)
-		leadTimes[r.Author] = append(leadTimes[r.Author], r.FeatureLeadTime)
+		ttfr[r.Author] = append(ttfr[r.Author], r.TimeToFirstReview)
+		feedback[r.Author] = append(feedback[r.Author], r.ReviewToApproval)
+		apprToMerge[r.Author] = append(apprToMerge[r.Author], r.FirstApprovalToMerge)
+		e2e[r.Author] = append(e2e[r.Author], r.CreatedToMerged)
 	}
 
 	out := make([]authorRow, 0, len(byLogin))
 	for login, a := range byLogin {
-		a.FirstRev = summarize(firstRevs[login])
-		a.LeadTime = summarize(leadTimes[login])
+		a.TTFR = summarize(ttfr[login])
+		a.Feedback = summarize(feedback[login])
+		a.ApprToMerge = summarize(apprToMerge[login])
+		a.E2E = summarize(e2e[login])
 		out = append(out, *a)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].PRs > out[j].PRs })
@@ -126,7 +136,9 @@ func summarizeAll(rows []prRow, windowDays int) summary {
 	}
 	firstRevs := make([]time.Duration, 0, len(rows))
 	firstToLast := make([]time.Duration, 0, len(rows))
+	revToAppr := make([]time.Duration, 0, len(rows))
 	firstApprToMerge := make([]time.Duration, 0, len(rows))
+	e2e := make([]time.Duration, 0, len(rows))
 	leadTimes := make([]time.Duration, 0, len(rows))
 	for _, r := range rows {
 		s.Adds += r.Additions
@@ -134,12 +146,16 @@ func summarizeAll(rows []prRow, windowDays int) summary {
 		s.ChangedFiles += r.ChangedFiles
 		firstRevs = append(firstRevs, r.TimeToFirstReview)
 		firstToLast = append(firstToLast, r.FirstToLastReview)
+		revToAppr = append(revToAppr, r.ReviewToApproval)
 		firstApprToMerge = append(firstApprToMerge, r.FirstApprovalToMerge)
+		e2e = append(e2e, r.CreatedToMerged)
 		leadTimes = append(leadTimes, r.FeatureLeadTime)
 	}
 	s.TimeToFirstReview = summarize(firstRevs)
 	s.FirstToLastReview = summarize(firstToLast)
+	s.ReviewToApproval = summarize(revToAppr)
 	s.FirstApprovalToMerge = summarize(firstApprToMerge)
+	s.CreatedToMerged = summarize(e2e)
 	s.FeatureLeadTime = summarize(leadTimes)
 	s.Sizes = bucketize(rows)
 	s.ByAuthor = authorRollup(rows)
